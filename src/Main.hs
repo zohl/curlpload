@@ -139,7 +139,7 @@ parseContentDisposition = either (const Nothing) Just . (parseOnly header) where
 
     
   params :: Parser [(BS.ByteString, BS.ByteString)]
-  params = (:[]) <$> param -- TODO (liftA2 (:) param params) <|> (return [])
+  params = (liftA2 (:) param params) <|> (return [])
 
   param :: Parser (BS.ByteString, BS.ByteString)
   param = do
@@ -297,7 +297,12 @@ app (CurlploadSettings {..}) conn request respond = dispatch (method, path) wher
     (Right GET, [name]) -> (listToMaybe <$> getUpload conn name) >>= maybe
       (respond $ responsePlain status404 "Not found")
       (\Upload {..} -> do
-        let cd = ContentDisposition { cdType = uDispositionType, cdFilename = uFileName }
+        let cd = ContentDisposition {
+            cdType = uDispositionType
+          , cdFilename = case csKeepNames of
+              True  -> uFileName
+              False -> name
+          }
         respond $ responseFile
           status200
           [(hContentType, BSC8.pack uMimeType), (hContentDisposition, formatContentDisposition cd)]
