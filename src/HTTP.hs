@@ -12,10 +12,13 @@ module HTTP (
 import Control.Applicative (liftA2, (<|>))
 import Data.Attoparsec.ByteString (Parser, parseOnly) 
 import Data.Attoparsec.ByteString.Char8 (takeWhile1, notInClass, char, skipSpace)
+import Data.ByteString.Builder (Builder, toLazyByteString, byteString)
 import Data.Maybe (fromMaybe)
+import Data.Monoid ((<>))
 import Network.HTTP.Types (HeaderName)
 import Network.Wai (Request(..))
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Lazy as BSL
 import qualified Data.ByteString.Char8 as BSC8
 
 -- TODO import from http-types
@@ -57,9 +60,10 @@ formatContentDisposition (ContentDisposition {..}) = BSC8.pack . concat $ [
   ]
 
 
-processBody :: Request -> (BS.ByteString -> IO a) -> IO [a]
-processBody request f = requestBody request >>= \result ->
-  if (result == BS.empty)
-  then return []
-  else liftA2 (:) (f result) (processBody request f)
-                                              
+processBody :: Request -> IO BSL.ByteString
+processBody request = toLazyByteString <$> getBody (byteString BS.empty) where
+  getBody :: Builder -> IO Builder
+  getBody builder = requestBody request >>= \result ->
+    if (result == BS.empty)
+    then (return builder)
+    else getBody (builder <> (byteString result))

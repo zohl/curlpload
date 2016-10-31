@@ -28,11 +28,9 @@ import Network.Wai.Handler.Warp.AutoQuit (withAutoQuit, withHeartBeat, AutoQuitS
 import Network.Wai.Handler.Warp.SocketActivation (withSocketActivation, SocketActivationSettings(..))
 import Settings (bindOptions, getSettings)
 import System.FilePath.Posix ((</>), takeExtension)
-import System.IO (withFile, IOMode(..))
 import System.Posix.Syslog (Option(..), withSyslog)
 import System.Posix.Syslog (SyslogConfig(..), Facility(..), Priority(..), PriorityMask(..), SyslogFn)
 import Text.Heredoc (str)
-import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BSC8
 import qualified Data.ByteString.Lazy as BSL
 import qualified Data.Text as T
@@ -96,7 +94,7 @@ app (CurlploadSettings {..}) conn request respond = dispatch (method, path) wher
                 True  -> cdFilename
                 False -> takeExtension cdFilename
           name <- addUpload conn filename (BSC8.unpack contentType) cdType
-          _    <- withFile (csUploadsPath </> name) WriteMode $ processBody request . BS.hPutStr
+          processBody request >>= BSL.writeFile (csUploadsPath </> name)
           respond $ responsePlain status200 (csHostName </> name))
         . parseContentDisposition
 
@@ -176,4 +174,3 @@ main = withSyslog (SyslogConfig {
             withHeartBeat chan $ app csSettings conn
 
     syslog DAEMON Notice "Exiting"
-
