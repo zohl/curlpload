@@ -5,6 +5,9 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module Settings (
     bindOptions
@@ -13,11 +16,13 @@ module Settings (
 
 
 import Common (CurlploadSettings(..))
-import Data.Default (def)
+import Data.Default (Default, def)
 import Data.Ini (Ini(..), readIniFile)
 import Data.Maybe (listToMaybe, fromMaybe, catMaybes)
 import Data.Typeable (Typeable)
+import Data.Word (Word16)
 import Database.PostgreSQL.Simple.Bind (PostgresBindOptions(..), PGFunction(..))
+import GHC.Generics (Generic)
 import System.Console.CmdArgs (Data, cmdArgs, (&=), help, explicit, name, typFile, typDir)
 import System.Directory (getTemporaryDirectory, createDirectoryIfMissing)
 import System.FilePath.Posix ((</>))
@@ -37,71 +42,86 @@ bindOptions = (def :: PostgresBindOptions) {
   }
 
 
-data Curlpload = Curlpload {
-    configFile     :: Maybe FilePath
-  , uploadsPath    :: Maybe FilePath
-  , hostName       :: Maybe String
-  , keepNames      :: Maybe Bool
+data CmdArgs = CmdArgs {
+    cmdConfigFile  :: Maybe FilePath
+
+  , cmdUploadsPath :: Maybe FilePath
+  , cmdHostName    :: Maybe String
+  , cmdKeepNames   :: Maybe Bool
   } deriving (Show, Data, Typeable)
 
+
+data IniArgs = IniArgs {
+    iniDBHost      :: Maybe String
+  , iniDBPort      :: Maybe Word16
+  , iniDBName      :: Maybe String
+  , iniDBUser      :: Maybe String
+  , iniUploadsPath :: Maybe FilePath
+  , iniHostName    :: Maybe String
+  , iniKeepNames   :: Maybe Bool
+  } deriving (Show, Generic)
+
+instance Default IniArgs
+
+readIniFileM :: SyslogFn -> FilePath -> IO (Maybe Ini)
+readIniFileM syslog fn = readIniFile fn >>= either
+  (\err -> do
+      syslog DAEMON Error (BSC8.pack $ "Cannot parse ini file: " ++ err)
+      return Nothing)
+  (return . Just)
 
 
 getSettings :: SyslogFn -> IO CurlploadSettings
 getSettings syslog = do
-    cmd <- cmdArgs Curlpload {
-        configFile = def
+  (CmdArgs {..}) <- cmdArgs CmdArgs {
+        cmdConfigFile = def
           &= explicit &= name "config-file" &= name "c"
           &= help "Configuration file"
           &= typFile
 
-      , uploadsPath = def
+      , cmdUploadsPath = def
           &= explicit &= name "uploads" &= name "u"
           &= help "Directory with uploads"
           &= typDir
 
-      , hostName = def
+      , cmdHostName = def
           &= explicit &= name "host-name" &= name "h"
           &= help "Host name"
 
-      , keepNames = def
+      , cmdKeepNames = def
           &= explicit &= name "keep-names" &= name "k"
           &= help "Keep names of uploaded files"
-      }
+    }
 
-    let emptyIni = Ini . HMap.fromList $ []
-    ini <- ($ (configFile cmd)) $ maybe
-      (return emptyIni)
-      (\fn -> readIniFile fn >>= either
-        (\err -> do
-           syslog DAEMON Error (BSC8.pack $ "Cannot parse ini file: " ++ err)
-           return emptyIni)
-        (return))
-    let fromIni section key = HMap.lookup section (unIni ini) >>= HMap.lookup key
+  (IniArgs {..}) <- case cmdConfigFile of
+    Nothing -> return def
+    Just fn -> readIniFileM syslog fn >>= \case
+      Nothing -> return def
+      Just d  -> return IniArgs {
+          iniDBHost      =          fromIni "DATABASE" "host"
+        , iniDBPort      = read <$> fromIni "DATABASE" "port"
+        , iniDBName      =          fromIni "DATABASE" "name"
+        , iniDBUser      =          fromIni "DATABASE" "user"
+        , iniUploadsPath =          fromIni "UPLOADS"  "path"
+        , iniHostName    =          fromIni "UPLOADS"  "host_name"
+        , iniKeepNames   = read <$> fromIni "UPLOADS"  "keep_names"
+        } where
+        fromIni :: T.Text -> T.Text -> Maybe String
+        fromIni section key = T.unpack <$> (HMap.lookup section (unIni d) >>= HMap.lookup key)
 
-    uploadsPath' <- getTemporaryDirectory >>= \tmp -> do
-      let result = tmp </> "uploads"
-      createDirectoryIfMissing True result
-      return result
+  uploadsPath' <- getTemporaryDirectory >>= \tmp -> do
+    let result = tmp </> "uploads"
+    createDirectoryIfMissing True result
+    return result
 
-    return $ CurlploadSettings {
-        csDBHost = fromMaybe "localhost" (T.unpack <$> fromIni "DATABASE" "host")
-      , csDBPort = fromMaybe 5432 ((read . T.unpack) <$> fromIni "DATABASE" "port")
-      , csDBName = fromMaybe "curlpload" (T.unpack <$> fromIni "DATABASE" "name")
-      , csDBUser = fromMaybe "curlpload" (T.unpack <$> fromIni "DATABASE" "user")
-
-      , csUploadsPath = fromMaybe uploadsPath' . listToMaybe . catMaybes $ [
-          (T.unpack <$> fromIni "UPLOADS" "path")
-        , (uploadsPath cmd)
-        ]
-
-      , csHostName = fromMaybe "localhost:8080" . listToMaybe . catMaybes $ [
-          (T.unpack <$> fromIni "UPLOADS" "host_name")
-        , (hostName cmd)
-        ]
-
-      , csKeepNames = fromMaybe False . listToMaybe . catMaybes $ [
-          ((read . T.unpack) <$> fromIni "UPLOADS" "keep_names")
-        , (keepNames cmd)
-        ]
-      }
-
+  return CurlploadSettings {
+      csDBHost      = getValue "localhost"      [iniDBHost                     ]
+    , csDBPort      = getValue 5432             [iniDBPort                     ]
+    , csDBName      = getValue "test_db"        [iniDBName                     ]
+    , csDBUser      = getValue "test_role"      [iniDBUser                     ]
+    , csUploadsPath = getValue uploadsPath'     [iniUploadsPath, cmdUploadsPath]
+    , csHostName    = getValue "localhost:8080" [iniHostName   , cmdHostName   ]
+    , csKeepNames   = getValue False            [iniKeepNames  , cmdKeepNames  ]
+    } where
+    getValue :: a -> [Maybe a] -> a
+    getValue x mxs = fromMaybe x (listToMaybe . catMaybes $ mxs)
