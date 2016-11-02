@@ -8,79 +8,68 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module DB (
-    checkDB
-  , withDB
+    withDB
   ) where
 
 import Common (Upload(..))
-import Control.Applicative ((<|>))
 import Control.Exception.Base (bracket, catch)
 import Control.Monad (void)
-import Data.Attoparsec.ByteString (parseOnly, many')
-import Data.Attoparsec.ByteString.Char8 (char, notChar)
 import Data.Text.Lazy (Text)
 import Data.Time (UTCTime)
-import Data.Time.Clock.POSIX (posixSecondsToUTCTime)
-import Database.PostgreSQL.Simple (SqlError, Connection, ConnectInfo(..), connect, close, execute_)
+import Database.PostgreSQL.Simple (SqlError, Connection, ConnectInfo(..), connect, close, execute_, FromRow)
 import Database.PostgreSQL.Simple.Bind (bindFunction, PostgresType)
-import Database.PostgreSQL.Simple.FromField (FromField(..), ResultError(..), returnError, typename)
 import Database.PostgreSQL.Simple.Types (Query(..))
 import Settings (bindOptions)
+import System.Posix.Syslog (SyslogFn, Facility(..), Priority(..))
 import qualified Data.ByteString as BS
-
+import qualified Data.ByteString.Char8 as BSC8
 
 concat <$> mapM (bindFunction bindOptions) [
     "function get_version () returns varchar"
   ]
-
 
 type instance PostgresType "varchar"     = String
 type instance PostgresType "text"        = Text
 type instance PostgresType "timestamptz" = UTCTime
 type instance PostgresType "t_upload"    = Upload
 
+instance FromRow Upload
 
-
-
-withDB :: ConnectInfo -> (Connection -> IO a) -> IO a
-withDB connectInfo = bracket (connect connectInfo) close
 
 include :: Connection -> String -> IO ()
 include conn fn = void $ BS.readFile fn >>= (execute_ conn . Query)
 
-checkDB :: Connection -> IO ()
-checkDB conn = do
-  version <- catch
-    (getVersion conn)
-    (\(_ :: SqlError) -> include conn "db/init.sql" >> return "init")
+checkDB :: SyslogFn -> Connection -> IO ()
+checkDB syslog conn = do
+  version <- catch (getVersion conn)
+    (\(_ :: SqlError) -> do
+        syslog DAEMON Warning "Schema version cannot be determined. Creating from scratch..."
+        include conn "db/init.sql"
+        return "init")
+  syslog DAEMON Warning (BSC8.pack $ "Schema version: " ++ version)
 
-  putStrLn version
+withDB :: forall a. SyslogFn -> ConnectInfo -> (Connection -> IO a) -> IO a
+withDB syslog connectInfo@(ConnectInfo {..}) f = bracket acquire release process where
+  acquire :: IO Connection
+  acquire = do
+    conn <- connect connectInfo
+    syslog DAEMON Notice (BSC8.pack . concat $ [
+                               "Database connection to "
+                             , connectUser, "@", connectDatabase
+                             , " (", connectHost, ":", show connectPort, ")"
+                             , " has been established"])
+    return conn
+
+  release :: Connection -> IO ()
+  release conn = do
+    close conn
+    syslog DAEMON Notice "Database connection has been closed"
+
+  process :: Connection -> IO a
+  process conn = do
+    checkDB syslog conn
+    f conn
 
 
--- TODO rewrite with generic parser
-instance FromField Upload where
-  fromField f v = checkType parseValue where
-
-    checkType cb = (("t_upload" /=) <$> typename f) >>= \b -> case b of
-      True -> returnError Incompatible f ""
-      False -> ($ v) $ maybe (returnError UnexpectedNull f "") cb
-
-    parseValue bs = ($ (parseOnly value bs)) $ either
-      (returnError ConversionFailed f) pure
-
-    value = do
-      _                <- char '('
-      uFileName        <- postgresString
-      _                <- char ','
-      uMimeType        <- postgresString
-      _                <- char ','
-      uDispositionType <- postgresString
-      _                <- char ','
-      _tmp             <- postgresString
-      _                <- char ')'
-      let uCreationDate = posixSecondsToUTCTime 0
-      return $ Upload {..}
-
-    postgresString = ((char '"') *> (many' $ notChar '"') <* (char '"')) <|> (many' $ notChar ',')
 
 

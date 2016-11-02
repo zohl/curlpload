@@ -1,3 +1,5 @@
+{-# LANGUAGE DeriveGeneric #-}
+
 module Common (
     Upload(..)
   , CurlploadSettings(..)
@@ -5,6 +7,7 @@ module Common (
 
 import Data.Time (UTCTime)
 import Data.Word (Word16)
+import GHC.Generics (Generic)
 
 
 data Upload = Upload {
@@ -12,7 +15,7 @@ data Upload = Upload {
   , uMimeType        :: String
   , uDispositionType :: String
   , uCreationDate    :: UTCTime
-  } deriving (Eq, Show)
+  } deriving (Eq, Show, Generic)
 
 
 data CurlploadSettings = CurlploadSettings {

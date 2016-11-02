@@ -21,7 +21,7 @@ import Data.Ini (Ini(..), readIniFile)
 import Data.Maybe (listToMaybe, fromMaybe, catMaybes)
 import Data.Typeable (Typeable)
 import Data.Word (Word16)
-import Database.PostgreSQL.Simple.Bind (PostgresBindOptions(..), PGFunction(..))
+import Database.PostgreSQL.Simple.Bind (PostgresBindOptions(..), PGFunction(..), ReturnType(..))
 import GHC.Generics (Generic)
 import System.Console.CmdArgs (Data, cmdArgs, (&=), help, explicit, name, typFile, typDir)
 import System.Directory (getTemporaryDirectory, createDirectoryIfMissing)
@@ -38,8 +38,14 @@ mkFunctionName (PGFunction _schema fname _args _result) = convertCase Snake Came
 
 bindOptions :: PostgresBindOptions
 bindOptions = (def :: PostgresBindOptions) {
-    pboFunctionName = mkFunctionName
-  }
+    pboFunctionName    = mkFunctionName
+  , pboSetOfReturnType = \case
+      "t_upload" -> AsRow
+      _          -> AsField
+  , pboIsNullable      = isNullable
+  } where
+    isNullable :: String -> String -> Bool
+    isNullable _ _ = False
 
 
 data CmdArgs = CmdArgs {

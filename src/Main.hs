@@ -14,7 +14,7 @@
 module Main where
 
 import Common (CurlploadSettings(..), Upload(..))
-import DB (checkDB, withDB)
+import DB (withDB)
 import Data.List (intercalate)
 import Data.Maybe (listToMaybe)
 import Database.PostgreSQL.Simple (Connection, ConnectInfo(..))
@@ -166,11 +166,9 @@ main = withSyslog (SyslogConfig {
         }
 
     withSocketActivation saSettings $
-      \sock -> withDB connectInfo $
-       \conn -> do
-         checkDB conn
-         withAutoQuit aqSettings $
-          \chan -> runSettingsSocket defaultSettings sock $
-            withHeartBeat chan $ app csSettings conn
+      \sock -> withDB syslog connectInfo $
+       \conn -> withAutoQuit aqSettings $
+        \chan -> runSettingsSocket defaultSettings sock $
+          withHeartBeat chan $ app csSettings conn
 
     syslog DAEMON Notice "Exiting"
