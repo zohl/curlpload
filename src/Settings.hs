@@ -52,8 +52,10 @@ data CmdArgs = CmdArgs {
     cmdConfigFile  :: Maybe FilePath
 
   , cmdUploadsPath :: Maybe FilePath
-  , cmdHostName    :: Maybe String
   , cmdKeepNames   :: Maybe Bool
+
+  , cmdHostName    :: Maybe String
+  , cmdHostPort    :: Maybe Int
   } deriving (Show, Data, Typeable)
 
 
@@ -62,9 +64,12 @@ data IniArgs = IniArgs {
   , iniDBPort      :: Maybe Word16
   , iniDBName      :: Maybe String
   , iniDBUser      :: Maybe String
+
   , iniUploadsPath :: Maybe FilePath
-  , iniHostName    :: Maybe String
   , iniKeepNames   :: Maybe Bool
+
+  , iniHostName    :: Maybe String
+  , iniHostPort    :: Maybe Int
   } deriving (Show, Generic)
 
 instance Default IniArgs
@@ -90,13 +95,17 @@ getSettings syslog = do
           &= help "Directory with uploads"
           &= typDir
 
+      , cmdKeepNames = def
+          &= explicit &= name "keep-names" &= name "k"
+          &= help "Keep names of uploaded files"
+
       , cmdHostName = def
           &= explicit &= name "host-name" &= name "h"
           &= help "Host name"
 
-      , cmdKeepNames = def
-          &= explicit &= name "keep-names" &= name "k"
-          &= help "Keep names of uploaded files"
+      , cmdHostPort = def
+          &= explicit &= name "host-port" &= name "p"
+          &= help "Port of the application"
     }
 
   (IniArgs {..}) <- case cmdConfigFile of
@@ -104,13 +113,14 @@ getSettings syslog = do
     Just fn -> readIniFileM syslog fn >>= \case
       Nothing -> return def
       Just d  -> return IniArgs {
-          iniDBHost      =          fromIni "DATABASE" "host"
-        , iniDBPort      = read <$> fromIni "DATABASE" "port"
-        , iniDBName      =          fromIni "DATABASE" "name"
-        , iniDBUser      =          fromIni "DATABASE" "user"
-        , iniUploadsPath =          fromIni "UPLOADS"  "path"
-        , iniHostName    =          fromIni "UPLOADS"  "host_name"
-        , iniKeepNames   = read <$> fromIni "UPLOADS"  "keep_names"
+          iniDBHost      =          fromIni "Database" "host"
+        , iniDBPort      = read <$> fromIni "Database" "port"
+        , iniDBName      =          fromIni "Database" "name"
+        , iniDBUser      =          fromIni "Database" "user"
+        , iniUploadsPath =          fromIni "Uploads"  "path"
+        , iniKeepNames   = read <$> fromIni "Uploads"  "keep_names"
+        , iniHostName    =          fromIni "Server"   "host"
+        , iniHostPort    = read <$> fromIni "Server"   "port"
         } where
         fromIni :: T.Text -> T.Text -> Maybe String
         fromIni section key = T.unpack <$> (HMap.lookup section (unIni d) >>= HMap.lookup key)
@@ -123,11 +133,12 @@ getSettings syslog = do
   return CurlploadSettings {
       csDBHost      = getValue "localhost"      [iniDBHost                     ]
     , csDBPort      = getValue 5432             [iniDBPort                     ]
-    , csDBName      = getValue "test_db"        [iniDBName                     ]
-    , csDBUser      = getValue "test_role"      [iniDBUser                     ]
+    , csDBName      = getValue "curlpload"      [iniDBName                     ]
+    , csDBUser      = getValue "curlpload"      [iniDBUser                     ]
     , csUploadsPath = getValue uploadsPath'     [iniUploadsPath, cmdUploadsPath]
-    , csHostName    = getValue "localhost:8080" [iniHostName   , cmdHostName   ]
     , csKeepNames   = getValue False            [iniKeepNames  , cmdKeepNames  ]
+    , csHostName    = getValue "localhost:8080" [iniHostName   , cmdHostName   ]
+    , csHostPort    = listToMaybe . catMaybes $ [iniHostPort   , cmdHostPort   ]
     } where
     getValue :: a -> [Maybe a] -> a
     getValue x mxs = fromMaybe x (listToMaybe . catMaybes $ mxs)

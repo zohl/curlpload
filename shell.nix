@@ -9,9 +9,9 @@ let
 
   haskellPackages_ = haskellPackages.override {
     overrides = self: super: {
-      postgresql-simple-bind = self.callPackage ~/src/haskell/postgresql-simple-bind/default.nix {};
-      warp-autoquit = self.callPackage ~/src/haskell/warp-autoquit/default.nix {};
-      warp-socket-activation = self.callPackage ~/src/haskell/warp-socket-activation/default.nix {};
+      postgresql-simple-bind = self.callPackage ../haskell/postgresql-simple-bind/default.nix {};
+      warp-autoquit = self.callPackage ../haskell/warp-autoquit/default.nix {};
+      warp-socket-activation = self.callPackage ../haskell/warp-socket-activation/default.nix {};
     };
   };
 

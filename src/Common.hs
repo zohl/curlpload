@@ -24,6 +24,7 @@ data CurlploadSettings = CurlploadSettings {
   , csDBName      :: String
   , csDBUser      :: String
   , csUploadsPath :: FilePath
-  , csHostName    :: String
   , csKeepNames   :: Bool
+  , csHostName    :: String
+  , csHostPort    :: Maybe Int
   }

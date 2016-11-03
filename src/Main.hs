@@ -15,6 +15,7 @@ module Main where
 
 import Common (CurlploadSettings(..), Upload(..))
 import DB (withDB)
+import Data.Default (def)
 import Data.List (intercalate)
 import Data.Maybe (listToMaybe)
 import Database.PostgreSQL.Simple (Connection, ConnectInfo(..))
@@ -145,23 +146,23 @@ main = withSyslog (SyslogConfig {
 
     syslog DAEMON Notice "Started"
 
-    csSettings <- getSettings syslog
+    csSettings@(CurlploadSettings {..}) <- getSettings syslog
 
-    let saSettings = SocketActivationSettings {
-        sasPort = Just 8080
+    let saSettings = (def::SocketActivationSettings) {
+        sasPort = csHostPort
       , sasHostPreference = "*4"
       }
 
-    let aqSettings = AutoQuitSettings {
+    let aqSettings = (def::AutoQuitSettings) {
         aqsTimeout = fromIntegral (600 :: Integer)
       , aqsOnExit = syslog DAEMON Notice "Staying inactive for a long time"
       }
 
     let connectInfo = ConnectInfo {
-          connectHost     = csDBHost csSettings
-        , connectPort     = csDBPort csSettings
-        , connectDatabase = csDBName csSettings
-        , connectUser     = csDBUser csSettings
+          connectHost     = csDBHost
+        , connectPort     = csDBPort
+        , connectDatabase = csDBName
+        , connectUser     = csDBUser
         , connectPassword = "TEST"
         }
 
