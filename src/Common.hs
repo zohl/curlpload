@@ -23,8 +23,9 @@ data CurlploadSettings = CurlploadSettings {
   , csDBPort      :: Word16
   , csDBName      :: String
   , csDBUser      :: String
+  , csDBPassword  :: Maybe FilePath
   , csUploadsPath :: FilePath
   , csKeepNames   :: Bool
   , csHostName    :: String
   , csHostPort    :: Maybe Int
-  }
+  } deriving (Eq, Show)

@@ -13,13 +13,15 @@ let
 
     [Database]
     ${optionalString (cfg.database.host != null) "host=${toString cfg.database.host}"}
+    ${optionalString (cfg.database.port != null) "port=${toString cfg.database.port}"}
     name=${cfg.database.name}
     user=${cfg.database.user}
-    ${optionalString (cfg.database.port != null) "password=${toString cfg.database.port}"}
+    ${optionalString (cfg.database.password != null) "password=${toString cfg.database.password}"}
 
     [Uploads]
     ${optionalString (cfg.uploads.path != null) "path=${cfg.uploads.path}"}
-    ${optionalString (cfg.uploads.keep-names != null) "keep_names=${toString cfg.uploads.keep-names}"}
+    ${optionalString (cfg.uploads.keep-names != null)
+       "keep_names=${if cfg.uploads.keep-names then "true" else "false"}"}
   '';
  in {
 
@@ -45,7 +47,7 @@ let
           type = types.str;
           default = "localhost";
           description = ''
-            TODO
+            External address of the service.
           '';
         };
 
@@ -97,7 +99,7 @@ let
           type = types.nullOr types.str;
           default = null;
           description = ''
-            The database user's password.
+            Path to a file with the database user's password.
           '';
         };
       };
@@ -134,7 +136,10 @@ let
         preStart = optionalString (cfg.uploads.path != null) ''
           mkdir -p "${cfg.uploads.path}"
           chown -R "${cfg.user}" "${cfg.uploads.path}"
-          chmod -R 644 "${cfg.uploads.path}"
+          chmod 755 "${cfg.uploads.path}"
+        '' + optionalString (cfg.database.password != null) ''
+          chown "${cfg.user}" "${cfg.database.password}"
+          chmod 400 "${cfg.database.password}"
         '';
 
         serviceConfig = {

@@ -17,6 +17,7 @@ module Settings (
 
 import Common (CurlploadSettings(..))
 import Data.Default (Default, def)
+import Data.Char (toUpper)
 import Data.Ini (Ini(..), readIniFile)
 import Data.Maybe (listToMaybe, fromMaybe, catMaybes)
 import Data.Typeable (Typeable)
@@ -64,6 +65,7 @@ data IniArgs = IniArgs {
   , iniDBPort      :: Maybe Word16
   , iniDBName      :: Maybe String
   , iniDBUser      :: Maybe String
+  , iniDBPassword  :: Maybe FilePath
 
   , iniUploadsPath :: Maybe FilePath
   , iniKeepNames   :: Maybe Bool
@@ -81,6 +83,15 @@ readIniFileM syslog fn = readIniFile fn >>= either
       return Nothing)
   (return . Just)
 
+getValue :: a -> [Maybe a] -> a
+getValue x mxs = fromMaybe x (listToMaybe . catMaybes $ mxs)
+
+getValueM :: (Monad m) => m a -> [Maybe a] -> m a
+getValueM mx mxs = fromMaybe mx (fmap return . listToMaybe . catMaybes $ mxs)
+
+capitalize :: String -> String
+capitalize (x:xs) = (toUpper x):xs
+capitalize _ = []
 
 getSettings :: SyslogFn -> IO CurlploadSettings
 getSettings syslog = do
@@ -113,32 +124,34 @@ getSettings syslog = do
     Just fn -> readIniFileM syslog fn >>= \case
       Nothing -> return def
       Just d  -> return IniArgs {
-          iniDBHost      =          fromIni "Database" "host"
-        , iniDBPort      = read <$> fromIni "Database" "port"
-        , iniDBName      =          fromIni "Database" "name"
-        , iniDBUser      =          fromIni "Database" "user"
-        , iniUploadsPath =          fromIni "Uploads"  "path"
-        , iniKeepNames   = read <$> fromIni "Uploads"  "keep_names"
-        , iniHostName    =          fromIni "Server"   "host"
-        , iniHostPort    = read <$> fromIni "Server"   "port"
+          iniDBHost      =                         fromIni "Database" "host"
+        , iniDBPort      = read                <$> fromIni "Database" "port"
+        , iniDBName      =                         fromIni "Database" "name"
+        , iniDBUser      =                         fromIni "Database" "user"
+        , iniDBPassword  =                         fromIni "Database" "password"
+        , iniUploadsPath =                         fromIni "Uploads"  "path"
+        , iniKeepNames   = (read . capitalize) <$> fromIni "Uploads"  "keep_names"
+        , iniHostName    =                         fromIni "Server"   "host"
+        , iniHostPort    = read                <$> fromIni "Server"   "port"
         } where
         fromIni :: T.Text -> T.Text -> Maybe String
         fromIni section key = T.unpack <$> (HMap.lookup section (unIni d) >>= HMap.lookup key)
 
-  uploadsPath' <- getTemporaryDirectory >>= \tmp -> do
-    let result = tmp </> "uploads"
-    createDirectoryIfMissing True result
-    return result
+  let mkUploadsPath = getTemporaryDirectory >>= \tmp -> do
+        let result = tmp </> "uploads"
+        createDirectoryIfMissing True result
+        return result
+
+  uploadsPath <- getValueM (mkUploadsPath) [iniUploadsPath, cmdUploadsPath]
 
   return CurlploadSettings {
       csDBHost      = getValue "localhost"      [iniDBHost                     ]
     , csDBPort      = getValue 5432             [iniDBPort                     ]
     , csDBName      = getValue "curlpload"      [iniDBName                     ]
     , csDBUser      = getValue "curlpload"      [iniDBUser                     ]
-    , csUploadsPath = getValue uploadsPath'     [iniUploadsPath, cmdUploadsPath]
+    , csDBPassword  = iniDBPassword
+    , csUploadsPath = uploadsPath
     , csKeepNames   = getValue False            [iniKeepNames  , cmdKeepNames  ]
     , csHostName    = getValue "localhost:8080" [iniHostName   , cmdHostName   ]
     , csHostPort    = listToMaybe . catMaybes $ [iniHostPort   , cmdHostPort   ]
-    } where
-    getValue :: a -> [Maybe a] -> a
-    getValue x mxs = fromMaybe x (listToMaybe . catMaybes $ mxs)
+    }

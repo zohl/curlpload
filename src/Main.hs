@@ -49,8 +49,8 @@ concat <$> mapM (bindFunction bindOptions) [
   ]
 
 
-app :: CurlploadSettings -> Connection -> Application
-app (CurlploadSettings {..}) conn request respond = dispatch (method, path) where
+app :: CurlploadSettings -> SyslogFn -> Connection -> Application
+app (CurlploadSettings {..}) syslog conn request respond = dispatch (method, path) where
   method = parseMethod . requestMethod $ request
   path = T.unpack <$> pathInfo request
 
@@ -62,7 +62,7 @@ app (CurlploadSettings {..}) conn request respond = dispatch (method, path) wher
       |# Usage:
       |# $ upload.sh filename [...script options] [...curl options]
       |#   where script options are:
-      |#   --inline            Set disposition type to inline
+      |#   --inline           Set disposition type to inline
       |#   --attachment       Set disposition type to attachment
       |
       |DISPOSITION_TYPE=x-default
@@ -96,6 +96,7 @@ app (CurlploadSettings {..}) conn request respond = dispatch (method, path) wher
                 False -> takeExtension cdFilename
           name <- addUpload conn filename (BSC8.unpack contentType) cdType
           processBody request >>= BSL.writeFile (csUploadsPath </> name)
+          syslog DAEMON Notice . BSC8.pack $ "Uploaded file: " ++ name
           respond $ responsePlain status200 (csHostName </> name))
         . parseContentDisposition
 
@@ -158,18 +159,20 @@ main = withSyslog (SyslogConfig {
       , aqsOnExit = syslog DAEMON Notice "Staying inactive for a long time"
       }
 
+    dbPassword <- maybe (return "") (fmap init . readFile) csDBPassword
+
     let connectInfo = ConnectInfo {
           connectHost     = csDBHost
         , connectPort     = csDBPort
         , connectDatabase = csDBName
         , connectUser     = csDBUser
-        , connectPassword = "TEST"
+        , connectPassword = dbPassword
         }
 
     withSocketActivation saSettings $
       \sock -> withDB syslog connectInfo $
        \conn -> withAutoQuit aqSettings $
         \chan -> runSettingsSocket defaultSettings sock $
-          withHeartBeat chan $ app csSettings conn
+          withHeartBeat chan $ app csSettings syslog conn
 
     syslog DAEMON Notice "Exiting"
