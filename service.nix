@@ -10,6 +10,7 @@ let
     [Server]
     host=${cfg.server.host}
     ${optionalString (cfg.server.port != null) "port=${toString cfg.server.port}"}
+    ${optionalString (cfg.server.lifetime != null) "lifetime=${toString cfg.server.lifetime}"}
 
     [Database]
     ${optionalString (cfg.database.host != null) "host=${toString cfg.database.host}"}
@@ -58,6 +59,15 @@ let
          description = ''
            Port of the application.
          '';
+        };
+
+        lifetime = mkOption {
+          type = types.nullOr types.int;
+          default = null;
+          example = 10;
+          description = ''
+            After which period of inactivity to shut down the server.
+          '';
         };
       };
 
@@ -148,6 +158,7 @@ let
           StandardOutput = "syslog";
           StandardError = "syslog";
           PermissionsStartOnly = true;
+          Restart = "no";
         };
 
         wantedBy = [ "multi-user.target" ];

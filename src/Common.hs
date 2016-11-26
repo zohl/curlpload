@@ -5,7 +5,7 @@ module Common (
   , CurlploadSettings(..)
   ) where
 
-import Data.Time (UTCTime)
+import Data.Time (UTCTime, NominalDiffTime)
 import Data.Word (Word16)
 import GHC.Generics (Generic)
 
@@ -19,13 +19,14 @@ data Upload = Upload {
 
 
 data CurlploadSettings = CurlploadSettings {
-    csDBHost      :: String
-  , csDBPort      :: Word16
-  , csDBName      :: String
-  , csDBUser      :: String
-  , csDBPassword  :: Maybe FilePath
-  , csUploadsPath :: FilePath
-  , csKeepNames   :: Bool
-  , csHostName    :: String
-  , csHostPort    :: Maybe Int
+    csDBHost       :: String
+  , csDBPort       :: Word16
+  , csDBName       :: String
+  , csDBUser       :: String
+  , csDBPassword   :: Maybe FilePath
+  , csUploadsPath  :: FilePath
+  , csKeepNames    :: Bool
+  , csHostName     :: String
+  , csHostPort     :: Maybe Int
+  , csHostLifetime :: Maybe NominalDiffTime
   } deriving (Eq, Show)

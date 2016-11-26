@@ -8,6 +8,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# OPTIONS_GHC -fno-warn-type-defaults #-}
 
 module Settings (
     bindOptions
@@ -20,6 +21,7 @@ import Data.Default (Default, def)
 import Data.Char (toUpper)
 import Data.Ini (Ini(..), readIniFile)
 import Data.Maybe (listToMaybe, fromMaybe, catMaybes)
+import Data.Time.Clock (NominalDiffTime)
 import Data.Typeable (Typeable)
 import Data.Word (Word16)
 import Database.PostgreSQL.Simple.Bind (PostgresBindOptions(..), PGFunction(..), ReturnType(..))
@@ -61,17 +63,18 @@ data CmdArgs = CmdArgs {
 
 
 data IniArgs = IniArgs {
-    iniDBHost      :: Maybe String
-  , iniDBPort      :: Maybe Word16
-  , iniDBName      :: Maybe String
-  , iniDBUser      :: Maybe String
-  , iniDBPassword  :: Maybe FilePath
+    iniDBHost       :: Maybe String
+  , iniDBPort       :: Maybe Word16
+  , iniDBName       :: Maybe String
+  , iniDBUser       :: Maybe String
+  , iniDBPassword   :: Maybe FilePath
 
-  , iniUploadsPath :: Maybe FilePath
-  , iniKeepNames   :: Maybe Bool
+  , iniUploadsPath  :: Maybe FilePath
+  , iniKeepNames    :: Maybe Bool
 
-  , iniHostName    :: Maybe String
-  , iniHostPort    :: Maybe Int
+  , iniHostName     :: Maybe String
+  , iniHostPort     :: Maybe Int
+  , iniHostLifetime :: Maybe NominalDiffTime
   } deriving (Show, Generic)
 
 instance Default IniArgs
@@ -124,15 +127,16 @@ getSettings syslog = do
     Just fn -> readIniFileM syslog fn >>= \case
       Nothing -> return def
       Just d  -> return IniArgs {
-          iniDBHost      =                         fromIni "Database" "host"
-        , iniDBPort      = read                <$> fromIni "Database" "port"
-        , iniDBName      =                         fromIni "Database" "name"
-        , iniDBUser      =                         fromIni "Database" "user"
-        , iniDBPassword  =                         fromIni "Database" "password"
-        , iniUploadsPath =                         fromIni "Uploads"  "path"
-        , iniKeepNames   = (read . capitalize) <$> fromIni "Uploads"  "keep_names"
-        , iniHostName    =                         fromIni "Server"   "host"
-        , iniHostPort    = read                <$> fromIni "Server"   "port"
+          iniDBHost       =                           fromIni "Database" "host"
+        , iniDBPort       = read                  <$> fromIni "Database" "port"
+        , iniDBName       =                           fromIni "Database" "name"
+        , iniDBUser       =                           fromIni "Database" "user"
+        , iniDBPassword   =                           fromIni "Database" "password"
+        , iniUploadsPath  =                           fromIni "Uploads"  "path"
+        , iniKeepNames    = (read . capitalize)   <$> fromIni "Uploads"  "keep_names"
+        , iniHostName     =                           fromIni "Server"   "host"
+        , iniHostPort     = read                  <$> fromIni "Server"   "port"
+        , iniHostLifetime = (fromIntegral . read) <$> fromIni "Server"   "lifetime"
         } where
         fromIni :: T.Text -> T.Text -> Maybe String
         fromIni section key = T.unpack <$> (HMap.lookup section (unIni d) >>= HMap.lookup key)
@@ -145,13 +149,14 @@ getSettings syslog = do
   uploadsPath <- getValueM (mkUploadsPath) [iniUploadsPath, cmdUploadsPath]
 
   return CurlploadSettings {
-      csDBHost      = getValue "localhost"      [iniDBHost                     ]
-    , csDBPort      = getValue 5432             [iniDBPort                     ]
-    , csDBName      = getValue "curlpload"      [iniDBName                     ]
-    , csDBUser      = getValue "curlpload"      [iniDBUser                     ]
-    , csDBPassword  = iniDBPassword
-    , csUploadsPath = uploadsPath
-    , csKeepNames   = getValue False            [iniKeepNames  , cmdKeepNames  ]
-    , csHostName    = getValue "localhost:8080" [iniHostName   , cmdHostName   ]
-    , csHostPort    = listToMaybe . catMaybes $ [iniHostPort   , cmdHostPort   ]
+      csDBHost       = getValue "localhost"      [iniDBHost                    ]
+    , csDBPort       = getValue 5432             [iniDBPort                    ]
+    , csDBName       = getValue "curlpload"      [iniDBName                    ]
+    , csDBUser       = getValue "curlpload"      [iniDBUser                    ]
+    , csDBPassword   = iniDBPassword
+    , csUploadsPath  = uploadsPath
+    , csKeepNames    = getValue False            [iniKeepNames   , cmdKeepNames]
+    , csHostName     = getValue "localhost:8080" [iniHostName    , cmdHostName ]
+    , csHostPort     = listToMaybe . catMaybes $ [iniHostPort    , cmdHostPort ]
+    , csHostLifetime = listToMaybe . catMaybes $ [iniHostLifetime              ]
     }

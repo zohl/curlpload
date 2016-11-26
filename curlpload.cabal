@@ -56,6 +56,8 @@ executable curlpload
                , warp-autoquit
                , warp-socket-activation
 
+  ghc-options: -threaded
+  
   if flag(dev)
     ghc-options:      -Wall -Werror
   else
