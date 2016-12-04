@@ -139,7 +139,7 @@ withEcho f = \syslog -> f $ \facility priority message -> do
 
 main :: IO ()
 main = withSyslog (SyslogConfig {
-    identifier = "curpload"
+    identifier = "curlpload"
   , options = [PID, ODELAY]
   , defaultFacility = DAEMON
   , priorityMask = UpTo Debug

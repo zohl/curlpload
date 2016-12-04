@@ -35,8 +35,12 @@ create function add_upload (
   p_file_name   varchar
 , p_mime_type   varchar
 , p_disposition varchar
+, p_limit       bigint  default 8
 ) returns varchar as
 $add_upload$
+declare
+  v_result varchar;
+begin
   insert into uploads(
     name
   , file_name 
@@ -48,14 +52,26 @@ $add_upload$
       when length(p_file_name) = 0 or p_file_name like '.%'
       then p_file_name
       else '_'||p_file_name
-    end) -- TODO fix collisions
+    end)
   , p_file_name
   , p_mime_type
   , p_disposition
   )
-  returning name;
+  returning name
+  into v_result;
+
+  return v_result;
+
+exception
+  when unique_violation then
+    if p_limit > 0 then
+      return add_upload(p_file_name, p_mime_type, p_disposition, p_limit - 1);
+    else
+      raise;
+    end if;
+end;
 $add_upload$
-language sql;
+language plpgsql;
 
 
 create type t_upload as (
