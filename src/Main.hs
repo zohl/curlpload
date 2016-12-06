@@ -170,7 +170,7 @@ main = withSyslog (SyslogConfig {
         }
 
     withSocketActivation saSettings $
-      \sock -> withDB syslog connectInfo $
+      \sock -> withDB csDBScripts syslog connectInfo $
        \conn -> withAutoQuit aqSettings $
         \chan -> runSettingsSocket defaultSettings sock $
           withHeartBeat chan $ app csSettings syslog conn

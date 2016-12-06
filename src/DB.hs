@@ -20,6 +20,7 @@ import Database.PostgreSQL.Simple (SqlError, Connection, ConnectInfo(..), connec
 import Database.PostgreSQL.Simple.Bind (bindFunction, PostgresType)
 import Database.PostgreSQL.Simple.Types (Query(..))
 import Settings (bindOptions)
+import System.FilePath.Posix ((</>))
 import System.Posix.Syslog (SyslogFn, Facility(..), Priority(..))
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BSC8
@@ -39,17 +40,17 @@ instance FromRow Upload
 include :: Connection -> String -> IO ()
 include conn fn = void $ BS.readFile fn >>= (execute_ conn . Query)
 
-checkDB :: SyslogFn -> Connection -> IO ()
-checkDB syslog conn = do
+checkDB :: FilePath -> SyslogFn -> Connection -> IO ()
+checkDB baseDir syslog conn = do
   version <- catch (getVersion conn)
     (\(_ :: SqlError) -> do
         syslog DAEMON Warning "Schema version cannot be determined. Creating from scratch..."
-        include conn "db/init.sql"
+        include conn (baseDir </> "init.sql")
         return "init")
   syslog DAEMON Warning (BSC8.pack $ "Schema version: " ++ version)
 
-withDB :: forall a. SyslogFn -> ConnectInfo -> (Connection -> IO a) -> IO a
-withDB syslog connectInfo@(ConnectInfo {..}) f = bracket acquire release process where
+withDB :: forall a. FilePath -> SyslogFn -> ConnectInfo -> (Connection -> IO a) -> IO a
+withDB baseDir syslog connectInfo@(ConnectInfo {..}) f = bracket acquire release process where
   acquire :: IO Connection
   acquire = do
     conn <- connect connectInfo
@@ -67,7 +68,7 @@ withDB syslog connectInfo@(ConnectInfo {..}) f = bracket acquire release process
 
   process :: Connection -> IO a
   process conn = do
-    checkDB syslog conn
+    checkDB baseDir syslog conn
     f conn
 
 

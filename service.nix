@@ -4,7 +4,7 @@ with lib;
 let
   cfg = config.services.curlpload;
 
-  curlpload-package = import ./shell.nix {};
+  curlpload-package = import ./shell.nix { };
 
   curlpload-config = pkgs.writeText "curlpload.ini" ''
     [Server]
@@ -154,7 +154,7 @@ let
 
         serviceConfig = {
           User = "${cfg.user}";
-          ExecStart = "${curlpload-package}/bin/curlpload -c ${curlpload-config}";
+          ExecStart = "${curlpload-package}/bin/curlpload -c ${curlpload-config} -s ${curlpload-package}/share/curlpload/db";
           StandardOutput = "syslog";
           StandardError = "syslog";
           PermissionsStartOnly = true;

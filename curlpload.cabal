@@ -13,6 +13,7 @@ maintainer:          zohl@fmap.me
 category:            Web
 build-type:          Simple
 cabal-version:       >=1.10
+data-dir:            db
 
 flag dev
   description:        Turn on development settings.

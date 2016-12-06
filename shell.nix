@@ -18,4 +18,14 @@ let
   drv = haskellPackages_.callPackage ./default.nix {};
 
 in 
-  if pkgs.lib.inNixShell then drv.env else drv
+  if pkgs.lib.inNixShell then drv.env else pkgs.stdenv.mkDerivation {
+    name = "${drv.pname}-package-${drv.version}";
+    src = ./.;
+
+    buildPhases = [ "installPhase" ];
+    installPhase = ''
+      mkdir -p "$out/share/${drv.pname}"
+      cp -R ${drv}/* "$out/"
+      cp -R "$src/db" "$out/share/${drv.pname}"
+    '';
+  }
