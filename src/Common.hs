@@ -24,10 +24,10 @@ data CurlploadSettings = CurlploadSettings {
   , csDBName       :: String
   , csDBUser       :: String
   , csDBPassword   :: Maybe FilePath
-  , csDBScripts    :: FilePath
   , csUploadsPath  :: FilePath
   , csKeepNames    :: Bool
   , csHostName     :: String
   , csHostPort     :: Maybe Int
   , csHostLifetime :: Maybe NominalDiffTime
+  , csShareDir     :: FilePath
   } deriving (Eq, Show)

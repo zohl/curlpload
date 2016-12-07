@@ -60,7 +60,7 @@ data CmdArgs = CmdArgs {
   , cmdHostName    :: Maybe String
   , cmdHostPort    :: Maybe Int
 
-  , cmdDBScripts   :: Maybe FilePath
+  , cmdShareDir    :: Maybe FilePath
   } deriving (Show, Data, Typeable)
 
 
@@ -123,9 +123,9 @@ getSettings syslog = do
           &= explicit &= name "host-port" &= name "p"
           &= help "Port of the application"
 
-      , cmdDBScripts = def
-          &= explicit &= name "db-scripts" &= name "s"
-          &= help "Directory with DB scripts (for non-FHS environment)"
+      , cmdShareDir = def
+          &= explicit &= name "share-dir" &= name "s"
+          &= help "Directory with non-executable files (for non-FHS environment)"
           &= typDir
     }
 
@@ -154,7 +154,6 @@ getSettings syslog = do
         return result
 
   uploadsPath <- getValueM (mkUploadsPath) [iniUploadsPath, cmdUploadsPath]
-  let dbScripts = "/usr/share/curlpload"
 
   return CurlploadSettings {
       csDBHost       = getValue "localhost"      [iniDBHost                    ]
@@ -162,11 +161,11 @@ getSettings syslog = do
     , csDBName       = getValue "curlpload"      [iniDBName                    ]
     , csDBUser       = getValue "curlpload"      [iniDBUser                    ]
     , csDBPassword   = iniDBPassword
-    , csDBScripts    = getValue dbScripts $      [cmdDBScripts                 ]
     , csUploadsPath  = uploadsPath
     , csKeepNames    = getValue False            [iniKeepNames   , cmdKeepNames]
     , csHostName     = getValue "localhost:8080" [iniHostName    , cmdHostName ]
     , csHostPort     = listToMaybe . catMaybes $ [iniHostPort    , cmdHostPort ]
     , csHostLifetime = listToMaybe . catMaybes $ [iniHostLifetime              ]
+    , csShareDir     = getValue "/usr/share" $   [cmdShareDir                  ]
     }
 

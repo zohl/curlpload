@@ -55,36 +55,9 @@ app (CurlploadSettings {..}) syslog conn request respond = dispatch (method, pat
   path = T.unpack <$> pathInfo request
 
   dispatch = \case
-    (Right GET, []) -> respond $ responsePlain status200 $ tail $ [str|
-      |#!/bin/sh
-      |#
-      |# This script uploads given file to the server.
-      |# Usage:
-      |# $ upload.sh filename [...script options] [...curl options]
-      |#   where script options are:
-      |#   --inline           Set disposition type to inline
-      |#   --attachment       Set disposition type to attachment
-      |
-      |DISPOSITION_TYPE=x-default
-      |FILE=$1
-      |
-      |while true; do
-      |  shift
-      |  case $1 in
-      |  --inline)
-      |    DISPOSITION_TYPE="inline"
-      |    ;;
-      |  --attachment)
-      |    DISPOSITION_TYPE="attachment"
-      |    ;;
-      |  *) break;
-      |  esac
-      |done
-      |
-      |curl --data-binary "@$FILE" \
-      |  -H "Content-Type: `file -bi "$FILE"`" \
-      |  -H 'Content-Disposition: '$DISPOSITION_TYPE'; filename="'`basename "$FILE"`'"' \
-      |  "$@" |] ++ csHostName ++ "\n"
+    (Right GET, []) -> do
+      script <- readFile $ csShareDir </> "upload.sh"
+      respond $ responsePlain status200 $ script ++ csHostName ++ "\n"
 
     (Right POST, []) ->
       withHeader hContentType $ \contentType ->
@@ -170,7 +143,7 @@ main = withSyslog (SyslogConfig {
         }
 
     withSocketActivation saSettings $
-      \sock -> withDB csDBScripts syslog connectInfo $
+      \sock -> withDB (csShareDir </> "db") syslog connectInfo $
        \conn -> withAutoQuit aqSettings $
         \chan -> runSettingsSocket defaultSettings sock $
           withHeartBeat chan $ app csSettings syslog conn

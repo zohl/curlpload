@@ -27,5 +27,6 @@ in
       mkdir -p "$out/share/${drv.pname}"
       cp -R ${drv}/* "$out/"
       cp -R "$src/db" "$out/share/${drv.pname}"
+      cp "$src/upload.sh" "$out/share/${drv.pname}"
     '';
   }

@@ -154,7 +154,7 @@ let
 
         serviceConfig = {
           User = "${cfg.user}";
-          ExecStart = "${curlpload-package}/bin/curlpload -c ${curlpload-config} -s ${curlpload-package}/share/curlpload/db";
+          ExecStart = "${curlpload-package}/bin/curlpload -c ${curlpload-config} -s ${curlpload-package}/share/curlpload";
           StandardOutput = "syslog";
           StandardError = "syslog";
           PermissionsStartOnly = true;
