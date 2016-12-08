@@ -65,18 +65,21 @@ data CmdArgs = CmdArgs {
 
 
 data IniArgs = IniArgs {
-    iniDBHost       :: Maybe String
-  , iniDBPort       :: Maybe Word16
-  , iniDBName       :: Maybe String
-  , iniDBUser       :: Maybe String
-  , iniDBPassword   :: Maybe FilePath
+    iniDBHost            :: Maybe String
+  , iniDBPort            :: Maybe Word16
+  , iniDBName            :: Maybe String
+  , iniDBUser            :: Maybe String
+  , iniDBPassword        :: Maybe FilePath
 
-  , iniUploadsPath  :: Maybe FilePath
-  , iniKeepNames    :: Maybe Bool
+  , iniUploadsPath       :: Maybe FilePath
+  , iniKeepNames         :: Maybe Bool
 
-  , iniHostName     :: Maybe String
-  , iniHostPort     :: Maybe Int
-  , iniHostLifetime :: Maybe NominalDiffTime
+  , iniHostName          :: Maybe String
+  , iniHostPort          :: Maybe Int
+  , iniHostLifetime      :: Maybe NominalDiffTime
+
+  , iniPublicHashLength  :: Maybe Int
+  , iniPrivateHashLength :: Maybe Int
   } deriving (Show, Generic)
 
 instance Default IniArgs
@@ -134,16 +137,18 @@ getSettings syslog = do
     Just fn -> readIniFileM syslog fn >>= \case
       Nothing -> return def
       Just d  -> return IniArgs {
-          iniDBHost       =                           fromIni "Database" "host"
-        , iniDBPort       = read                  <$> fromIni "Database" "port"
-        , iniDBName       =                           fromIni "Database" "name"
-        , iniDBUser       =                           fromIni "Database" "user"
-        , iniDBPassword   =                           fromIni "Database" "password"
-        , iniUploadsPath  =                           fromIni "Uploads"  "path"
-        , iniKeepNames    = (read . capitalize)   <$> fromIni "Uploads"  "keep_names"
-        , iniHostName     =                           fromIni "Server"   "host"
-        , iniHostPort     = read                  <$> fromIni "Server"   "port"
-        , iniHostLifetime = (fromIntegral . read) <$> fromIni "Server"   "lifetime"
+          iniDBHost            =                           fromIni "Database" "host"
+        , iniDBPort            = read                  <$> fromIni "Database" "port"
+        , iniDBName            =                           fromIni "Database" "name"
+        , iniDBUser            =                           fromIni "Database" "user"
+        , iniDBPassword        =                           fromIni "Database" "password"
+        , iniUploadsPath       =                           fromIni "Uploads"  "path"
+        , iniKeepNames         = (read . capitalize)   <$> fromIni "Uploads"  "keep_names"
+        , iniPublicHashLength  = read                  <$> fromIni "Uploads"  "public_hash_length"
+        , iniPrivateHashLength = read                  <$> fromIni "Uploads"  "private_hash_length"
+        , iniHostName          =                           fromIni "Server"   "host"
+        , iniHostPort          = read                  <$> fromIni "Server"   "port"
+        , iniHostLifetime      = (fromIntegral . read) <$> fromIni "Server"   "lifetime"
         } where
         fromIni :: T.Text -> T.Text -> Maybe String
         fromIni section key = T.unpack <$> (HMap.lookup section (unIni d) >>= HMap.lookup key)
@@ -156,16 +161,18 @@ getSettings syslog = do
   uploadsPath <- getValueM (mkUploadsPath) [iniUploadsPath, cmdUploadsPath]
 
   return CurlploadSettings {
-      csDBHost       = getValue "localhost"      [iniDBHost                    ]
-    , csDBPort       = getValue 5432             [iniDBPort                    ]
-    , csDBName       = getValue "curlpload"      [iniDBName                    ]
-    , csDBUser       = getValue "curlpload"      [iniDBUser                    ]
-    , csDBPassword   = iniDBPassword
-    , csUploadsPath  = uploadsPath
-    , csKeepNames    = getValue False            [iniKeepNames   , cmdKeepNames]
-    , csHostName     = getValue "localhost:8080" [iniHostName    , cmdHostName ]
-    , csHostPort     = listToMaybe . catMaybes $ [iniHostPort    , cmdHostPort ]
-    , csHostLifetime = listToMaybe . catMaybes $ [iniHostLifetime              ]
-    , csShareDir     = getValue "/usr/share" $   [cmdShareDir                  ]
+      csDBHost            = getValue "localhost"      [iniDBHost                    ]
+    , csDBPort            = getValue 5432             [iniDBPort                    ]
+    , csDBName            = getValue "curlpload"      [iniDBName                    ]
+    , csDBUser            = getValue "curlpload"      [iniDBUser                    ]
+    , csDBPassword        = iniDBPassword
+    , csUploadsPath       = uploadsPath
+    , csKeepNames         = getValue False            [iniKeepNames   , cmdKeepNames]
+    , csHostName          = getValue "localhost:8080" [iniHostName    , cmdHostName ]
+    , csHostPort          = listToMaybe . catMaybes $ [iniHostPort    , cmdHostPort ]
+    , csHostLifetime      = listToMaybe . catMaybes $ [iniHostLifetime              ]
+    , csShareDir          = getValue "/usr/share" $   [cmdShareDir                  ]
+    , csPublicHashLength  = getValue 8                [iniPublicHashLength          ]
+    , csPrivateHashLength = getValue 32               [iniPrivateHashLength         ]
     }
 

@@ -19,15 +19,17 @@ data Upload = Upload {
 
 
 data CurlploadSettings = CurlploadSettings {
-    csDBHost       :: String
-  , csDBPort       :: Word16
-  , csDBName       :: String
-  , csDBUser       :: String
-  , csDBPassword   :: Maybe FilePath
-  , csUploadsPath  :: FilePath
-  , csKeepNames    :: Bool
-  , csHostName     :: String
-  , csHostPort     :: Maybe Int
-  , csHostLifetime :: Maybe NominalDiffTime
-  , csShareDir     :: FilePath
+    csDBHost            :: String
+  , csDBPort            :: Word16
+  , csDBName            :: String
+  , csDBUser            :: String
+  , csDBPassword        :: Maybe FilePath
+  , csUploadsPath       :: FilePath
+  , csKeepNames         :: Bool
+  , csHostName          :: String
+  , csHostPort          :: Maybe Int
+  , csHostLifetime      :: Maybe NominalDiffTime
+  , csShareDir          :: FilePath
+  , csPublicHashLength  :: Int
+  , csPrivateHashLength :: Int
   } deriving (Eq, Show)
