@@ -4,10 +4,15 @@
 # Usage:
 # $ upload.sh [...script options] filename [...curl options]
 #   where script options are:
-#   --inline           Set disposition type to inline
-#   --attachment       Set disposition type to attachment
+#
+#   --inline           Set disposition type to inline.
+#   --attachment       Set disposition type to attachment.
+#
+#   --public           Produce shorter hash prefix in url.
+#   --private          Produce longer hash prefix in url.
 
 DISPOSITION_TYPE=x-default
+VISIBILITY=default
 
 while true; do
   case $1 in
@@ -16,6 +21,12 @@ while true; do
     ;;
   --attachment)
     DISPOSITION_TYPE="attachment"
+    ;;
+  --public)
+    VISIBILITY="public"
+    ;;
+  --private)
+    VISIBILITY="private"
     ;;
   *) break;
   esac

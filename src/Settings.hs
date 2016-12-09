@@ -16,7 +16,7 @@ module Settings (
   ) where
 
 
-import Common (CurlploadSettings(..))
+import Common (CurlploadSettings(..), Visibility(..))
 import Data.Default (Default, def)
 import Data.Char (toUpper)
 import Data.Ini (Ini(..), readIniFile)
@@ -80,6 +80,7 @@ data IniArgs = IniArgs {
 
   , iniPublicHashLength  :: Maybe Int
   , iniPrivateHashLength :: Maybe Int
+  , iniVisibility        :: Maybe Visibility
   } deriving (Show, Generic)
 
 instance Default IniArgs
@@ -174,5 +175,6 @@ getSettings syslog = do
     , csShareDir          = getValue "/usr/share" $   [cmdShareDir                  ]
     , csPublicHashLength  = getValue 8                [iniPublicHashLength          ]
     , csPrivateHashLength = getValue 32               [iniPrivateHashLength         ]
+    , csVisibility        = getValue Private          [iniVisibility                ]
     }
 

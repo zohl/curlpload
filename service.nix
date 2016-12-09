@@ -23,6 +23,12 @@ let
     ${optionalString (cfg.uploads.path != null) "path=${cfg.uploads.path}"}
     ${optionalString (cfg.uploads.keep-names != null)
        "keep_names=${if cfg.uploads.keep-names then "true" else "false"}"}
+    ${optionalString (cfg.uploads.public-hash-length != null)
+      "public_hash_length=${toString cfg.uploads.public-hash-length}"}
+    ${optionalString (cfg.uploads.private-hash-length != null)
+      "private_hash_length=${toString cfg.uploads.private-hash-length}"}
+    ${optionalString (cfg.uploads.default-visibility != null)
+      "default_privacy_type=${cfg.uploads.default-visibility}"}
   '';
  in {
 
@@ -128,6 +134,30 @@ let
           default = false;
           description = ''
             Whether to keep original files names.
+          '';
+        };
+
+        public-hash-length = mkOption {
+          type = types.nullOr types.int;
+          default = null;
+          description = ''
+            Length of a hash for a public upload.
+          '';
+        };
+
+        private-hash-length = mkOption {
+          type = types.nullOr types.int;
+          default = null;
+          description = ''
+            Length of a hash for a private upload.
+          '';
+        };
+
+        default-visibility = mkOption {
+          type = types.nullOr types.str;
+          default = null;
+          description = ''
+            Default visibility type for uploads without the respective parameter.
           '';
         };
       };
