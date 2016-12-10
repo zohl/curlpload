@@ -28,7 +28,7 @@ let
     ${optionalString (cfg.uploads.private-hash-length != null)
       "private_hash_length=${toString cfg.uploads.private-hash-length}"}
     ${optionalString (cfg.uploads.default-visibility != null)
-      "default_privacy_type=${cfg.uploads.default-visibility}"}
+      "default_visibility=${cfg.uploads.default-visibility}"}
   '';
  in {
 

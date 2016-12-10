@@ -29,10 +29,11 @@ concat <$> mapM (bindFunction bindOptions) [
     "function get_version () returns varchar"
   ]
 
-type instance PostgresType "varchar"     = String
-type instance PostgresType "text"        = Text
-type instance PostgresType "timestamptz" = UTCTime
-type instance PostgresType "t_upload"    = Upload
+type instance PostgresType "varchar"      = String
+type instance PostgresType "bigint"       = Int
+type instance PostgresType "text"         = Text
+type instance PostgresType "timestamptz"  = UTCTime
+type instance PostgresType "t_upload"     = Upload
 
 instance FromRow Upload
 

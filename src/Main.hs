@@ -5,6 +5,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
@@ -13,7 +14,7 @@
 
 module Main where
 
-import Common (CurlploadSettings(..), Upload(..))
+import Common (CurlploadSettings(..), Upload(..), Visibility(..), (<|>))
 import DB (withDB)
 import Data.Default (def)
 import Data.List (intercalate)
@@ -21,8 +22,8 @@ import Data.Maybe (listToMaybe)
 import Database.PostgreSQL.Simple (Connection, ConnectInfo(..))
 import Database.PostgreSQL.Simple.Bind (bindFunction)
 import HTTP (ContentDisposition(..), hContentDisposition, parseContentDisposition)
-import HTTP (formatContentDisposition, processBody)
-import Network.HTTP.Types (StdMethod(..), parseMethod, status200, status404, status403, hContentType)
+import HTTP (formatContentDisposition, processBody, hVisibilityType, parseVisibilityType)
+import Network.HTTP.Types (HeaderName, StdMethod(..), parseMethod, status200, status404, status403, hContentType)
 import Network.Wai (Application, Request(..), responseLBS, responseFile)
 import Network.Wai.Handler.Warp (runSettingsSocket, defaultSettings)
 import Network.Wai.Handler.Warp.AutoQuit (withAutoQuit, withHeartBeat, AutoQuitSettings(..))
@@ -35,6 +36,21 @@ import Text.Heredoc (str)
 import qualified Data.ByteString.Char8 as BSC8
 import qualified Data.ByteString.Lazy as BSL
 import qualified Data.Text as T
+import Control.Exception (Exception)
+import Control.Monad.Catch (throwM, catch)
+import Data.Typeable (Typeable)
+
+data CurlploadException
+  = WrongHeaderFormat HeaderName
+  | UnresolvedVisibilityType
+  deriving (Eq, Typeable)
+
+instance Show CurlploadException where
+  show (WrongHeaderFormat h) = "Wrong format of " ++ (show h) ++ " header"
+  show _                     = "Something went wrong"
+
+instance (Exception CurlploadException)
+
 
 concat <$> mapM (bindFunction bindOptions) [
     [str|
@@ -42,6 +58,8 @@ concat <$> mapM (bindFunction bindOptions) [
     |  p_file_name   varchar
     |, p_mime_type   varchar
     |, p_disposition varchar
+    |, p_hash_length bigint
+    |, p_limit       bigint default 8
     |) returns varchar
     |]
 
@@ -61,17 +79,30 @@ app (CurlploadSettings {..}) syslog conn request respond = dispatch (method, pat
 
     (Right POST, []) ->
       withHeader hContentType $ \contentType ->
-      withHeader hContentDisposition $ maybe
-        (respond $ responsePlain status403 "Wrong format of Content-Disposition header")
-        (\ContentDisposition {..} -> do
-          let filename = case csKeepNames of
-                True  -> cdFilename
-                False -> takeExtension cdFilename
-          name <- addUpload conn filename (BSC8.unpack contentType) cdType
-          processBody request >>= BSL.writeFile (csUploadsPath </> name)
-          syslog DAEMON Notice . BSC8.pack $ "Uploaded file: " ++ name
-          respond $ responsePlain status200 (csHostName </> name))
-        . parseContentDisposition
+      withHeader hVisibilityType $ \visibilityType ->
+      withHeader hContentDisposition $ \contentDisposition -> flip catch handleError $ do
+
+        hashLength <- maybe
+          (throwM $ WrongHeaderFormat hVisibilityType)
+          (return . (<|> csDefaultVisibility))
+          (parseVisibilityType visibilityType) >>= \case
+              Public  -> return csPublicHashLength
+              Private -> return csPrivateHashLength
+              _       -> throwM $ UnresolvedVisibilityType
+
+        (ContentDisposition {..}) <- maybe
+          (throwM $ WrongHeaderFormat hContentDisposition)
+          (return)
+          (parseContentDisposition contentDisposition)
+
+        let filename = case csKeepNames of
+              True  -> cdFilename
+              False -> takeExtension cdFilename
+
+        name <- addUpload conn filename (BSC8.unpack contentType) cdType hashLength Nothing
+        processBody request >>= BSL.writeFile (csUploadsPath </> name)
+        syslog DAEMON Notice . BSC8.pack $ "Uploaded file: " ++ name
+        respond $ responsePlain status200 (csHostName </> name)
 
     (Right GET, [name]) -> (listToMaybe <$> getUpload conn name) >>= maybe
       (respond $ responsePlain status404 "Not found")
@@ -99,6 +130,8 @@ app (CurlploadSettings {..}) syslog conn request respond = dispatch (method, pat
     (respond $ responsePlain status403 $ (show hdr) ++ " must be provided")
     (response)
     (lookup hdr $ requestHeaders request)
+
+  handleError = \(ex :: CurlploadException) -> respond $ responsePlain status403 (show ex)
 
 
 withEcho :: (SyslogFn -> IO a) -> (SyslogFn -> IO a)

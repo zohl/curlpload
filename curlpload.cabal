@@ -40,6 +40,7 @@ executable curlpload
                , containers
                , data-default
                , directory
+               , exceptions
                , filepath
                , hsyslog
                , http-types

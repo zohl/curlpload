@@ -34,8 +34,10 @@ while true; do
 done
 
 FILE=$1
+shift
 
 curl --data-binary "@$FILE" \
   -H "Content-Type: `file -bi "$FILE"`" \
+  -H 'Visibility-Type: '$VISIBILITY \
   -H 'Content-Disposition: '$DISPOSITION_TYPE'; filename="'`basename "$FILE"`'"' \
   "$@" \
