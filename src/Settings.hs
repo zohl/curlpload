@@ -16,7 +16,7 @@ module Settings (
   ) where
 
 
-import Common (CurlploadSettings(..), Visibility(..), (<|>))
+import Common (CurlploadSettings(..), Visibility(..), Expiration(..), (<|>))
 import Data.Default (Default, def)
 import Data.Char (toUpper)
 import Data.Ini (Ini(..), readIniFile)
@@ -81,6 +81,8 @@ data IniArgs = IniArgs {
   , iniPublicHashLength  :: Maybe Int
   , iniPrivateHashLength :: Maybe Int
   , iniDefaultVisibility :: Maybe Visibility
+
+  , iniDefaultExpiration :: Maybe Expiration
   } deriving (Show, Generic)
 
 instance Default IniArgs
@@ -148,6 +150,7 @@ getSettings syslog = do
         , iniPublicHashLength  = read                  <$> fromIni "Uploads"  "public_hash_length"
         , iniPrivateHashLength = read                  <$> fromIni "Uploads"  "private_hash_length"
         , iniDefaultVisibility = read                  <$> fromIni "Uploads"  "default_visibility"
+        , iniDefaultExpiration = read                  <$> fromIni "Uploads"  "default_expiration"
         , iniHostName          =                           fromIni "Server"   "host"
         , iniHostPort          = read                  <$> fromIni "Server"   "port"
         , iniHostLifetime      = (fromIntegral . read) <$> fromIni "Server"   "lifetime"
@@ -176,6 +179,7 @@ getSettings syslog = do
     , csShareDir          = getValue "/usr/share" $   [cmdShareDir                  ]
     , csPublicHashLength  = getValue 8                [iniPublicHashLength          ]
     , csPrivateHashLength = getValue 32               [iniPrivateHashLength         ]
-    , csDefaultVisibility = Private <|> (getValue Default [iniDefaultVisibility     ])
+    , csDefaultVisibility = (getValue DefaultVisibility [iniDefaultVisibility]) <|> Private
+    , csDefaultExpiration = (getValue DefaultExpiration [iniDefaultExpiration]) <|> Never
     }
 
