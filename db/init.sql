@@ -32,11 +32,12 @@ create unique index idx_uploads_name on uploads(name);
 
 
 create function add_upload (
-  p_file_name   varchar
-, p_mime_type   varchar
-, p_disposition varchar
-, p_hash_length bigint
-, p_limit       bigint  default 8
+  p_file_name     varchar
+, p_mime_type     varchar
+, p_disposition   varchar
+, p_hash_length   bigint
+, p_expire_after  interval default null
+, p_limit         bigint   default 8
 ) returns varchar as
 $add_upload$
 declare
@@ -47,6 +48,7 @@ begin
   , file_name
   , mime_type
   , disposition
+  , expiration_date
   )
   values (
     substring(md5(random()::text) for p_hash_length) || (case
@@ -57,6 +59,7 @@ begin
   , p_file_name
   , p_mime_type
   , p_disposition
+  , current_timestamp + p_expire_after
   )
   returning name
   into v_result;
@@ -66,7 +69,13 @@ begin
 exception
   when unique_violation then
     if p_limit > 0 then
-      return add_upload(p_file_name, p_mime_type, p_disposition, p_hash_length, p_limit - 1);
+      return add_upload(
+        p_file_name
+      , p_mime_type
+      , p_disposition
+      , p_hash_length
+      , p_expire_after
+      , p_limit - 1);
     else
       raise;
     end if;

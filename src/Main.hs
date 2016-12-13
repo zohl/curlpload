@@ -14,7 +14,7 @@
 
 module Main where
 
-import Common (CurlploadSettings(..), Upload(..), Visibility(..), (<|>))
+import Common (CurlploadSettings(..), Upload(..), Visibility(..), Expiration(..), (<|>))
 import DB (withDB)
 import Data.Default (def)
 import Data.List (intercalate)
@@ -23,6 +23,7 @@ import Database.PostgreSQL.Simple (Connection, ConnectInfo(..))
 import Database.PostgreSQL.Simple.Bind (bindFunction)
 import HTTP (ContentDisposition(..), hContentDisposition, parseContentDisposition)
 import HTTP (formatContentDisposition, processBody, hVisibilityType, parseVisibilityType)
+import HTTP (hExpirationTime, parseExpirationTime)
 import Network.HTTP.Types (HeaderName, StdMethod(..), parseMethod, status200, status404, status403, hContentType)
 import Network.Wai (Application, Request(..), responseLBS, responseFile)
 import Network.Wai.Handler.Warp (runSettingsSocket, defaultSettings)
@@ -43,6 +44,7 @@ import Data.Typeable (Typeable)
 data CurlploadException
   = WrongHeaderFormat HeaderName
   | UnresolvedVisibilityType
+  | UnresolvedExpirationTime
   deriving (Eq, Typeable)
 
 instance Show CurlploadException where
@@ -55,11 +57,12 @@ instance (Exception CurlploadException)
 concat <$> mapM (bindFunction bindOptions) [
     [str|
     |function add_upload (
-    |  p_file_name   varchar
-    |, p_mime_type   varchar
-    |, p_disposition varchar
-    |, p_hash_length bigint
-    |, p_limit       bigint default 8
+    |  p_file_name    varchar
+    |, p_mime_type    varchar
+    |, p_disposition  varchar
+    |, p_hash_length  bigint
+    |, p_expire_after interval default null
+    |, p_limit        bigint   default 8
     |) returns varchar
     |]
 
@@ -80,6 +83,7 @@ app (CurlploadSettings {..}) syslog conn request respond = dispatch (method, pat
     (Right POST, []) ->
       withHeader hContentType $ \contentType ->
       withHeader hVisibilityType $ \visibilityType ->
+      withHeader hExpirationTime $ \expirationTime ->
       withHeader hContentDisposition $ \contentDisposition -> flip catch handleError $ do
 
         hashLength <- maybe
@@ -90,6 +94,14 @@ app (CurlploadSettings {..}) syslog conn request respond = dispatch (method, pat
               Private -> return csPrivateHashLength
               _       -> throwM $ UnresolvedVisibilityType
 
+        expiration <- maybe
+          (throwM $ WrongHeaderFormat hExpirationTime)
+          (return . (<|> csDefaultExpiration))
+          (parseExpirationTime expirationTime) >>= \case
+              Never         -> return Nothing
+              ExpireAfter t -> return . Just $ t
+              _             -> throwM $ UnresolvedExpirationTime
+
         (ContentDisposition {..}) <- maybe
           (throwM $ WrongHeaderFormat hContentDisposition)
           (return)
@@ -99,7 +111,14 @@ app (CurlploadSettings {..}) syslog conn request respond = dispatch (method, pat
               True  -> cdFilename
               False -> takeExtension cdFilename
 
-        name <- addUpload conn filename (BSC8.unpack contentType) cdType hashLength Nothing
+        name <- addUpload conn
+          filename
+          (BSC8.unpack contentType)
+          cdType
+          hashLength
+          expiration
+          Nothing
+
         processBody request >>= BSL.writeFile (csUploadsPath </> name)
         syslog DAEMON Notice . BSC8.pack $ "Uploaded file: " ++ name
         respond $ responsePlain status200 (csHostName </> name)

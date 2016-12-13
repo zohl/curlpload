@@ -54,6 +54,7 @@ executable curlpload
                , time
                , unordered-containers
                , wai
+               , wai-app-static
                , warp
                , warp-autoquit
                , warp-socket-activation

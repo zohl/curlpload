@@ -10,6 +10,9 @@ module HTTP (
   , hVisibilityType
   , parseVisibilityType
 
+  , hExpirationTime
+  , parseExpirationTime
+
   , processBody
   ) where
 
@@ -24,7 +27,7 @@ import Network.Wai (Request(..))
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BSL
 import qualified Data.ByteString.Char8 as BSC8
-import Common (Visibility)
+import Common (Visibility, Expiration)
 import Data.Char (isAlpha)
 
 -- TODO import from http-types
@@ -45,7 +48,6 @@ parseContentDisposition = either (const Nothing) Just . (parseOnly header) where
     cdType <- BSC8.unpack <$> (takeWhile1 $ notInClass " ;")
     cdFilename <- (BSC8.unpack . fromMaybe undefined . lookup "filename") <$> params
     return $ ContentDisposition {..}
-
 
   params :: Parser [(BS.ByteString, BS.ByteString)]
   params = (liftA2 (:) param params) <|> (return [])
@@ -71,9 +73,15 @@ hVisibilityType = "Visibility-Type"
 parseVisibilityType :: BS.ByteString -> Maybe Visibility
 parseVisibilityType = either (const Nothing) Just . (parseOnly header) where
   header :: Parser Visibility
-  header = do
-    _ <- skipSpace
-    read . BSC8.unpack <$> takeWhile1 isAlpha
+  header = skipSpace *> (read . BSC8.unpack <$> takeWhile1 isAlpha)
+
+hExpirationTime :: HeaderName
+hExpirationTime = "Expiration-Time"
+
+parseExpirationTime :: BS.ByteString -> Maybe Expiration
+parseExpirationTime = either (const Nothing) Just . (parseOnly header) where
+  header :: Parser Expiration
+  header = skipSpace *> (read . BSC8.unpack <$> takeWhile1 isAlpha)
 
 
 processBody :: Request -> IO BSL.ByteString

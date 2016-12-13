@@ -15,7 +15,7 @@ import Common (Upload(..))
 import Control.Exception.Base (bracket, catch)
 import Control.Monad (void)
 import Data.Text.Lazy (Text)
-import Data.Time (UTCTime)
+import Data.Time (UTCTime, NominalDiffTime)
 import Database.PostgreSQL.Simple (SqlError, Connection, ConnectInfo(..), connect, close, execute_, FromRow)
 import Database.PostgreSQL.Simple.Bind (bindFunction, PostgresType)
 import Database.PostgreSQL.Simple.Types (Query(..))
@@ -34,6 +34,7 @@ type instance PostgresType "bigint"       = Int
 type instance PostgresType "text"         = Text
 type instance PostgresType "timestamptz"  = UTCTime
 type instance PostgresType "t_upload"     = Upload
+type instance PostgresType "interval"     = NominalDiffTime
 
 instance FromRow Upload
 
