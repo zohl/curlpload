@@ -29,6 +29,8 @@ let
       "private_hash_length=${toString cfg.uploads.private-hash-length}"}
     ${optionalString (cfg.uploads.default-visibility != null)
       "default_visibility=${cfg.uploads.default-visibility}"}
+    ${optionalString (cfg.uploads.default-expiration != null)
+      "default_expiration=${cfg.uploads.default-expiration}"}
   '';
  in {
 
@@ -158,6 +160,14 @@ let
           default = null;
           description = ''
             Default visibility type for uploads without the respective parameter.
+          '';
+        };
+
+        default-expiration = mkOption {
+          type = types.nullOr types.str;
+          default = null;
+          description = ''
+            Default expiration time for uploads without the respective parameter.
           '';
         };
       };
