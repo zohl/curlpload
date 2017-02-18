@@ -37,6 +37,7 @@ import Text.Heredoc (str)
 import qualified Data.ByteString.Char8 as BSC8
 import qualified Data.ByteString.Lazy as BSL
 import qualified Data.Text as T
+import qualified Data.Text.IO as T
 import Control.Exception (Exception)
 import Control.Monad.Catch (throwM, catch)
 import Data.Typeable (Typeable)
@@ -77,8 +78,9 @@ app (CurlploadSettings {..}) syslog conn request respond = dispatch (method, pat
 
   dispatch = \case
     (Right GET, []) -> do
-      script <- readFile $ csShareDir </> "upload.sh"
-      respond $ responsePlain status200 $ script ++ csHostName ++ "\n"
+      script <- fmap (T.unpack . T.replace "$HOSTNAME" (T.pack csHostName))
+              . T.readFile $ csShareDir </> "upload.sh"
+      respond $ responsePlain status200 $ script -- script ++ csHostName ++ "\n"
 
     (Right POST, []) ->
       withHeader hContentType $ \contentType ->
@@ -174,9 +176,10 @@ main = withSyslog (SyslogConfig {
 
     csSettings@(CurlploadSettings {..}) <- getSettings syslog
 
-    let saSettings = (def::SocketActivationSettings) {
+    let saSettings = (def::SocketActivationSettings ()) {
         sasPort = csHostPort
       , sasHostPreference = "*4"
+      , sasFallbackAction = \_ -> return ()
       }
 
     let aqSettings = (def::AutoQuitSettings) {

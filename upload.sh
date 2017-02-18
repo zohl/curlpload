@@ -48,4 +48,6 @@ curl --data-binary "@$FILE" \
   -H 'Visibility-Type: '$VISIBILITY \
   -H 'Content-Disposition: '$DISPOSITION_TYPE'; filename="'`basename "$FILE"`'"' \
   -H 'Expiration-Time: '$EXPIRE \
-  "$@" \
+  "$@" "$HOSTNAME"
+
+echo
