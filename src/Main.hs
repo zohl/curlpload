@@ -80,12 +80,12 @@ app (CurlploadSettings {..}) syslog conn request respond = dispatch (method, pat
     (Right GET, []) -> do
       script <- fmap (T.unpack . T.replace "$HOSTNAME" (T.pack csHostName))
               . T.readFile $ csShareDir </> "upload.sh"
-      respond $ responsePlain status200 $ script -- script ++ csHostName ++ "\n"
+      respond $ responsePlain status200 $ script
 
     (Right POST, []) ->
       withHeader hContentType $ \contentType ->
       withHeader hVisibilityType $ \visibilityType ->
-      withHeader hExpirationTime $ \expirationTime ->
+      withMaybeHeader hExpirationTime $ \expirationTime ->
       withHeader hContentDisposition $ \contentDisposition -> flip catch handleError $ do
 
         hashLength <- maybe
@@ -98,8 +98,11 @@ app (CurlploadSettings {..}) syslog conn request respond = dispatch (method, pat
 
         expiration <- maybe
           (throwM $ WrongHeaderFormat hExpirationTime)
-          (return . (<|> csDefaultExpiration))
-          (parseExpirationTime expirationTime) >>= \case
+          (return)
+          (maybe
+            (Just csDefaultExpiration)
+            (fmap (<|> csDefaultExpiration) . parseExpirationTime)
+            expirationTime) >>= \case
               Never         -> return Nothing
               ExpireAfter t -> return . Just $ t
               _             -> throwM $ UnresolvedExpirationTime
@@ -151,6 +154,8 @@ app (CurlploadSettings {..}) syslog conn request respond = dispatch (method, pat
     (respond $ responsePlain status403 $ (show hdr) ++ " must be provided")
     (response)
     (lookup hdr $ requestHeaders request)
+
+  withMaybeHeader hdr response = response $ (lookup hdr $ requestHeaders request)
 
   handleError = \(ex :: CurlploadException) -> respond $ responsePlain status403 (show ex)
 

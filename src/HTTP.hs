@@ -81,7 +81,7 @@ hExpirationTime = "Expiration-Time"
 parseExpirationTime :: BS.ByteString -> Maybe Expiration
 parseExpirationTime = either (const Nothing) Just . (parseOnly header) where
   header :: Parser Expiration
-  header = skipSpace *> (read . BSC8.unpack <$> takeWhile1 isAlpha)
+  header = skipSpace *> (read . BSC8.unpack <$> takeWhile1 (/= ' '))
 
 
 processBody :: Request -> IO BSL.ByteString
